@@ -1,50 +1,73 @@
 import streamlit as st
 import pickle
 import re
-import string
+import pandas as pd
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
 
-# 1. Load the "Intelligence" (The two .pkl files)
-@st.cache_resource
-def load_assets():
-    # Loading the brain and the translator saved in Step 1
-    model = pickle.load(open('model_news.pkl', 'rb'))
-    vectorizer = pickle.load(open('vectorizer.pkl', 'rb'))
-    return model, vectorizer
+# 1. Page Config
+st.set_page_config(page_title="NLP Fake News Detector", layout="wide")
 
-model, vectorizer = load_assets()
-
-# 2. Preprocessing Function (The logic used in your Methodology)
+# 2. Functions
 def clean_text(text):
-    text = text.lower() # Normalization
-    text = re.sub('\[.*?\]', '', text)
-    text = re.sub("\\W"," ",text) # Special character removal
-    text = re.sub('https?://\S+|www\.\S+', '', text)
-    text = re.sub('<.*?>+', '', text)
-    text = re.sub('[%s]' % re.escape(string.punctuation), '', text)
-    text = re.sub('\n', '', text)
-    text = re.sub('\w*\d\w*', '', text)
+    text = text.lower()
+    text = re.sub(r'\W', ' ', text)
     return text
 
-# 3. User Interface (The Demo Website)
-st.title("🔍 Fake News Detection System")
-st.write("Using Logistic Regression to verify news authenticity.")
+@st.cache_resource
+def load_assets():
+    with open('model_fake_news.pkl', 'rb') as f:
+        model = pickle.load(f)
+    with open('vectorizer.pkl', 'rb') as f:
+        vectorizer = pickle.load(f)
+    return model, vectorizer
 
-# User pastes news content here
-news_input = st.text_area("Enter News Content:", height=200)
+# --- UI SIDEBAR (Requirement: Measurement on Performance) ---
+st.sidebar.title("Model Metrics")
+st.sidebar.info("Model: Passive Aggressive Classifier")
+st.sidebar.write("✅ Accuracy: 94.5%") # Ganti dengan nilai sebenar anda
+st.sidebar.write("✅ Language: English")
 
-if st.button("Predict"):
-    if news_input:
-        # Clean the input text
-        cleaned = clean_text(news_input)
-        # Transform using the 5,000 feature vectorizer
-        vectorized_text = vectorizer.transform([cleaned])
-        # Model makes the decision
-        prediction = model.predict(vectorized_text)
+# --- MAIN UI ---
+st.title("📰 AI-Powered Fake News Detection")
+st.markdown("Enter news content below to analyze its authenticity.")
+
+user_input = st.text_area("News Content:", height=200)
+
+if st.button("Analyze Now"):
+    if user_input:
+        model, vectorizer = load_assets()
         
-        # Display the result
-        if prediction[0] == 1:
-            st.success("Analysis: REAL NEWS")
-        else:
-            st.error("Analysis: FAKE NEWS")
+        # Preprocessing
+        cleaned = clean_text(user_input)
+        vec_input = vectorizer.transform([cleaned])
+        
+        # Prediction
+        prediction = model.predict(vec_input)[0]
+        
+        # UI Columns for Results
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Result")
+            if prediction == 0: # 0 = Fake
+                st.error("🚨 THIS IS FAKE NEWS")
+            else:
+                st.success("✅ THIS IS REAL NEWS")
+            
+            # Feature: Confidence Score (Using decision_function for PAC model)
+            score = model.decision_function(vec_input)
+            confidence = abs(score[0]) # Nilai lebih tinggi = lebih yakin
+            st.metric("Model Confidence Score", f"{confidence:.2f}")
+
+        with col2:
+            st.subheader("Word Cloud Visualization")
+            # Feature: Word Cloud (Requirement: Visual Aids)
+            wc = WordCloud(background_color='white', width=400, height=300).generate(cleaned)
+            fig, ax = plt.subplots()
+            ax.imshow(wc, interpolation='bilinear')
+            ax.axis('off')
+            st.pyplot(fig)
+            
     else:
-        st.warning("Please enter some text.")
+        st.warning("Please paste some text first.")
