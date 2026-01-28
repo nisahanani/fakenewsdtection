@@ -1,23 +1,25 @@
-import pandas as pd
-import pickle
-from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.naive_bayes import MultinomialNB
+import streamlit as st
+import joblib
 
-# NLP Pipeline
-tfidf = TfidfVectorizer(stop_words='english', max_df=0.7)
-x = tfidf.fit_transform(df['text'])
-y = df['label']
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+# Load model & vectorizer
+model = joblib.load("model_lr.pkl")
+tfidf = joblib.load("tfidf.pkl")
 
-# Train Models
-lr = LogisticRegression().fit(x_train, y_train)
-nb = MultinomialNB().fit(x_train, y_train)
+st.title("📰 Fake News Detection System")
+st.write("This application predicts whether a news article is fake or real using NLP.")
 
-# SAVE THE FILES (This fixes the error)
-with open('vectorizer.pkl', 'wb') as f: pickle.dump(tfidf, f)
-with open('model_lr.pkl', 'wb') as f: pickle.dump(lr, f)
-with open('model_nb.pkl', 'wb') as f: pickle.dump(nb, f)
+# Input text
+news_text = st.text_area("Enter news article text:")
 
-print("Success: .pkl files created!")
+# Prediction
+if st.button("Predict"):
+    if news_text.strip() == "":
+        st.warning("Please enter some text.")
+    else:
+        text_vector = tfidf.transform([news_text])
+        prediction = model.predict(text_vector)
+
+        if prediction[0] == 1:
+            st.error("🔴 Fake News")
+        else:
+            st.success("🟢 Real News")
