@@ -1,73 +1,65 @@
 import streamlit as st
 import pickle
 import re
-import pandas as pd
-import matplotlib.pyplot as plt
-from wordcloud import WordCloud
 
-# 1. Page Config
-st.set_page_config(page_title="NLP Fake News Detector", layout="wide")
+# 1. Page Setup
+st.set_page_config(page_title="Multi-Model NLP Detector", layout="wide")
 
-# 2. Functions
-def clean_text(text):
-    text = text.lower()
-    text = re.sub(r'\W', ' ', text)
-    return text
-
+# 2. Load Models (Pastikan anda sudah save kedua-dua model .pkl)
 @st.cache_resource
-def load_assets():
-    with open('model_fake_news.pkl', 'rb') as f:
-        model = pickle.load(f)
+def load_all_models():
+    # Load Vectorizer (Biasanya dikongsi)
     with open('vectorizer.pkl', 'rb') as f:
         vectorizer = pickle.load(f)
-    return model, vectorizer
+    # Load LR Model
+    with open('model_lr.pkl', 'rb') as f:
+        lr_model = pickle.load(f)
+    # Load Naive Bayes Model
+    with open('model_nb.pkl', 'rb') as f:
+        nb_model = pickle.load(f)
+    return vectorizer, lr_model, nb_model
 
-# --- UI SIDEBAR (Requirement: Measurement on Performance) ---
-st.sidebar.title("Model Metrics")
-st.sidebar.info("Model: Passive Aggressive Classifier")
-st.sidebar.write("✅ Accuracy: 94.5%") # Ganti dengan nilai sebenar anda
-st.sidebar.write("✅ Language: English")
+def clean_text(text):
+    return re.sub(r'\W', ' ', text.lower())
 
-# --- MAIN UI ---
-st.title("📰 AI-Powered Fake News Detection")
-st.markdown("Enter news content below to analyze its authenticity.")
+# --- UI ---
+st.title("📰 Fake News Detection: LR vs Naive Bayes")
+st.write("Compare how different algorithms classify the same news article.")
 
-user_input = st.text_area("News Content:", height=200)
+user_input = st.text_area("Paste News Content:", height=200)
 
-if st.button("Analyze Now"):
+if st.button("Compare Models"):
     if user_input:
-        model, vectorizer = load_assets()
-        
-        # Preprocessing
+        vec, lr, nb = load_all_models()
         cleaned = clean_text(user_input)
-        vec_input = vectorizer.transform([cleaned])
+        vec_text = vec.transform([cleaned])
         
-        # Prediction
-        prediction = model.predict(vec_input)[0]
+        # Predictions
+        pred_lr = lr.predict(vec_text)[0]
+        pred_nb = nb.predict(vec_text)[0]
         
-        # UI Columns for Results
+        # Display Side-by-Side
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("Result")
-            if prediction == 0: # 0 = Fake
-                st.error("🚨 THIS IS FAKE NEWS")
+            st.header("Logistic Regression")
+            if pred_lr == 1:
+                st.success("Result: REAL")
             else:
-                st.success("✅ THIS IS REAL NEWS")
-            
-            # Feature: Confidence Score (Using decision_function for PAC model)
-            score = model.decision_function(vec_input)
-            confidence = abs(score[0]) # Nilai lebih tinggi = lebih yakin
-            st.metric("Model Confidence Score", f"{confidence:.2f}")
+                st.error("Result: FAKE")
+            # Show Probability
+            prob_lr = lr.predict_proba(vec_text)[0]
+            st.write(f"Confidence: {max(prob_lr)*100:.2f}%")
 
         with col2:
-            st.subheader("Word Cloud Visualization")
-            # Feature: Word Cloud (Requirement: Visual Aids)
-            wc = WordCloud(background_color='white', width=400, height=300).generate(cleaned)
-            fig, ax = plt.subplots()
-            ax.imshow(wc, interpolation='bilinear')
-            ax.axis('off')
-            st.pyplot(fig)
+            st.header("Naive Bayes")
+            if pred_nb == 1:
+                st.success("Result: REAL")
+            else:
+                st.error("Result: FAKE")
+            # Show Probability
+            prob_nb = nb.predict_proba(vec_text)[0]
+            st.write(f"Confidence: {max(prob_nb)*100:.2f}%")
             
     else:
-        st.warning("Please paste some text first.")
+        st.warning("Please enter text first.")
