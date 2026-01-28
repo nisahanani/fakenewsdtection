@@ -5,13 +5,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 
-# Load your datasets
-fake = pd.read_csv('fake.csv')
-real = pd.read_csv('real.csv')
-fake['label'] = 0
-real['label'] = 1
-df = pd.concat([fake, real]).reset_index(drop=True)
-
 # NLP Pipeline
 tfidf = TfidfVectorizer(stop_words='english', max_df=0.7)
 x = tfidf.fit_transform(df['text'])
